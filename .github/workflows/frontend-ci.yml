@@ -45,7 +45,6 @@ jobs:
       run: npm run build
       env:
         CI: true # CRA build script often uses this
-        # REACT_APP_SENTRY_DSN: ${{ secrets.SENTRY_DSN }} # Example for Sentry DSN
         # Add other build-time environment variables here
 
   # Optional: Add Cypress E2E tests here if needed as a separate job
@@ -73,7 +72,6 @@ jobs:
   #       wait-on: 'http://localhost:3000' # If testing dev server
   #       # browser: chrome # specify browser if needed
   #     env:
-  #       CYPRESS_SENTRY_DSN: ${{ secrets.SENTRY_DSN }} # Example
   #       # Add other Cypress env vars here
   #       # Note: For testing `build` output, you'd need to serve the static files and point Cypress to that.
   #       # The above example is more for a dev server. For build, you might use `npx http-server build`
@@ -84,11 +82,7 @@ jobs:
         # Common environment variables for all steps in this job
         # Example: NODE_ENV: 'test'
         # REACT_APP_API_BASE_URL: ${{ vars.API_BASE_URL_STAGING }} # Using repository/org variables
-        REACT_APP_SENTRY_DSN: ${{ secrets.SENTRY_DSN }} # Using secrets
         # Ensure these secrets/variables are configured in your GitHub repository settings.
-        # SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }} # If needed for sourcemaps etc.
-        # SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
-        # SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
 
     # Optional: Deploy step (e.g., to GitHub Pages, S3, etc.)
     # - name: Deploy to GitHub Pages

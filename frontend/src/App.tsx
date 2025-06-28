@@ -1,7 +1,8 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import { Box, AppBar, Toolbar, Typography, Drawer, List, ListItem, ListItemText, Container, Grid, Paper } from '@mui/material';
-import { styled, useTheme } from '@mui/material/styles';
+import { BrowserRouter as Router, Routes, Route, Link as RouterLink } from 'react-router-dom';
+import { Box, AppBar, Toolbar, Typography, Drawer, List, ListItemButton, ListItemText, Container, Grid, Paper, useTheme } from '@mui/material'; // Added useTheme back
+import { styled } from '@mui/material/styles';
+
 
 const drawerWidth = 240;
 
@@ -34,18 +35,19 @@ const DrawerHeader = styled('div')(({ theme }) => ({
 }));
 
 function App() {
-  const theme = useTheme();
-  const [open, setOpen] = React.useState(true); // Drawer is open by default
+  const theme = useTheme(); // Re-added useTheme
+  const [open, setOpen] = React.useState(true); // setOpen might be used for a toggle button
 
   // Example: Responsive breakpoints (from plan: 900px/600px)
   // These can be used with MUI's `useMediaQuery` hook or directly in sx props.
+  // import useMediaQuery from '@mui/material/useMediaQuery';
   // const isMobile = useMediaQuery(theme.breakpoints.down('sm')); // 600px
   // const isTablet = useMediaQuery(theme.breakpoints.down('md')); // 900px
 
   return (
     <Router>
       <Box sx={{ display: 'flex' }}>
-        <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
+        <AppBar position="fixed" sx={{ zIndex: theme.zIndex.drawer + 1 }}> {/* Use theme here */}
           <Toolbar>
             <Typography variant="h6" noWrap component="div">
               ERP System
@@ -63,14 +65,14 @@ function App() {
           }}
           variant="persistent"
           anchor="left"
-          open={open}
+          open={open} // Controlled by state
         >
           <DrawerHeader>
-            {/* Could add an IconButton here to close the drawer */}
+            {/* Could add an IconButton here to close the drawer using setOpen(!open) */}
             <Typography>Navigation</Typography>
           </DrawerHeader>
           <List>
-            {['Dashboard', 'Inventory', 'Accounting', 'Reports'].map((text, index) => (
+            {['Dashboard', 'Inventory', 'Accounting', 'Reports'].map((text) => (
               <ListItem button key={text} component={Link} to={`/${text.toLowerCase()}`}>
                 <ListItemText primary={text} />
               </ListItem>
