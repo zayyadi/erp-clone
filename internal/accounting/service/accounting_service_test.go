@@ -236,24 +236,31 @@ func TestAccountingService_CreateJournalEntry(t *testing.T) {
 	})
 
 	t.Run("Error - Unbalanced Entry", func(t *testing.T) {
+		// Initialize mocks and service specifically for this sub-test for isolation
+		mockCoaRepoSub := mocks.NewChartOfAccountRepositoryMock(t)
+		mockJournalRepoSub := mocks.NewJournalEntryRepositoryMock(t)
+		accountingServiceSub := service.NewAccountingService(mockCoaRepoSub, mockJournalRepoSub)
+		ctxSub := context.Background() // Use a fresh context for the sub-test
+
 		unbalancedReq := dto.CreateJournalEntryRequest{
 			Description: "Unbalanced",
 			Lines: []dto.JournalLineRequest{
-				{AccountID: cashAccountID, Amount: 100.00, IsDebit: true},
-				{AccountID: revenueAccountID, Amount: 90.00, IsDebit: false}, // Unbalanced
+				{AccountID: cashAccountID, Amount: 100.00, IsDebit: true}, // cashAccountID is from parent scope
+				{AccountID: revenueAccountID, Amount: 90.00, IsDebit: false}, // revenueAccountID from parent
 			},
 		}
-		// Mock GetByID for accounts used in lines
-		mockCoaRepo.On("GetByID", ctx, cashAccountID).Return(cashAccount, nil).Once()
-		mockCoaRepo.On("GetByID", ctx, revenueAccountID).Return(revenueAccount, nil).Once()
+		// Mock GetByID for accounts used in lines, using sub-test's mocks
+		mockCoaRepoSub.On("GetByID", ctxSub, cashAccountID).Return(cashAccount, nil).Once() // cashAccount from parent
+		mockCoaRepoSub.On("GetByID", ctxSub, revenueAccountID).Return(revenueAccount, nil).Once() // revenueAccount from parent
 
-		_, err := accountingService.CreateJournalEntry(ctx, unbalancedReq)
+		_, err := accountingServiceSub.CreateJournalEntry(ctxSub, unbalancedReq)
 		assert.Error(t, err)
 		assert.IsType(t, &app_errors.ValidationError{}, err)
 		assert.Contains(t, err.Error(), "debits (100.00) must equal credits (90.00)")
-		mockCoaRepo.AssertExpectations(t)
-		// No call to journalRepo.Create should happen
-		mockJournalRepo.AssertNotCalled(t, "Create", ctx, mock.Anything)
+
+		// Assert expectations on the sub-test's mocks
+		mockCoaRepoSub.AssertExpectations(t)
+		mockJournalRepoSub.AssertNotCalled(t, "Create", ctxSub, mock.Anything)
 	})
 
     t.Run("Error - Line Account Not Found", func(t *testing.T) {
@@ -482,7 +489,7 @@ func TestAccountingService_GetTrialBalance(t *testing.T) {
         assert.NotNil(t, tb)
         assert.Len(t, tb.Lines, 5) // All active accounts
         assert.Equal(t, tb.TotalDebits, tb.TotalCredits)
-        assert.InDelta(t, 1200.00, tb.TotalDebits, 0.001) // Cash 800 DR, AR 0, AP 0, Revenue 1000 CR, Expense 200 DR => 1000 DR, 1000 CR
+        assert.InDelta(t, 1000.00, tb.TotalDebits, 0.001) // Corrected: Cash 800 DR + Expense 200 DR = 1000 DR
 
         // Check specific account balances (Cash: 1000 DR - 200 CR = 800 DR)
         foundCash := false
@@ -589,14 +596,22 @@ func TestAccountingService_DeleteJournalEntry(t *testing.T) {
     })
 
     t.Run("Error - Cannot Delete Posted Entry", func(t *testing.T) {
-        postedEntry := &models.JournalEntry{ID: entryID, Status: models.StatusPosted}
-        mockJournalRepo.On("GetByID", ctx, entryID).Return(postedEntry, nil).Once()
+        // Initialize mocks and service specifically for this sub-test for isolation
+        mockJournalRepoSub := mocks.NewJournalEntryRepositoryMock(t)
+        // coaRepo is not used by DeleteJournalEntry method in service, so can pass nil.
+        accountingServiceSub := service.NewAccountingService(nil, mockJournalRepoSub)
+        ctxSub := context.Background()
 
-        err := s.DeleteJournalEntry(ctx, entryID)
+        postedEntry := &models.JournalEntry{ID: entryID, Status: models.StatusPosted} // entryID from parent scope
+        mockJournalRepoSub.On("GetByID", ctxSub, entryID).Return(postedEntry, nil).Once()
+
+        err := accountingServiceSub.DeleteJournalEntry(ctxSub, entryID)
         assert.Error(t, err)
         assert.IsType(t, &app_errors.ConflictError{}, err)
-        mockJournalRepo.AssertExpectations(t) // GetByID was called
-        mockJournalRepo.AssertNotCalled(t, "Delete", ctx, entryID) // Delete should not be called
+
+        // Assert expectations on the sub-test's mock
+        mockJournalRepoSub.AssertExpectations(t) // GetByID was called
+        mockJournalRepoSub.AssertNotCalled(t, "Delete", ctxSub, entryID) // Delete should not be called
     })
 
     t.Run("Error - Entry Not Found for Deletion", func(t *testing.T) {

@@ -1,10 +1,13 @@
 package api
 
 import (
-	"erp-system/api/handlers"
-	"erp-system/api/middleware"
-	"erp-system/internal/accounting/repository"
-	"erp-system/internal/accounting/service"
+	acc_handlers "erp-system/api/handlers" // Alias for accounting handlers
+	inv_handlers "erp-system/api/handlers" // Alias for inventory handlers (will be distinct type)
+	// "erp-system/api/middleware"
+	acc_repo "erp-system/internal/accounting/repository" // Alias for accounting repo
+	acc_service "erp-system/internal/accounting/service" // Alias for accounting service
+	inv_repo "erp-system/internal/inventory/repository" // Alias for inventory repo
+	inv_service "erp-system/internal/inventory/service" // Alias for inventory service
 	"erp-system/pkg/logger"
 	"net/http"
 
@@ -26,64 +29,35 @@ func NewRouter(db *gorm.DB) *mux.Router {
 		w.Write([]byte(`{"status":"ok","message":"ERP system is healthy"}`))
 	}).Methods("GET")
 
-	// Initialize repositories
-	coaRepo := repository.NewChartOfAccountRepository(db)
-	journalRepo := repository.NewJournalEntryRepository(db)
-	// Add other repositories here as modules are implemented
+	// --- Initialize Accounting Dependencies ---
+	accountingCoaRepo := acc_repo.NewChartOfAccountRepository(db)
+	accountingJournalRepo := acc_repo.NewJournalEntryRepository(db)
+	accountingService := acc_service.NewAccountingService(accountingCoaRepo, accountingJournalRepo)
+	accountingAPIHandlers := acc_handlers.NewAccountingHandlers(accountingService)
 
-	// Initialize services
-	accountingService := service.NewAccountingService(coaRepo, journalRepo)
-	// Add other services here
+	// --- Initialize Inventory Dependencies ---
+	itemRepo := inv_repo.NewItemRepository(db)
+	warehouseRepo := inv_repo.NewWarehouseRepository(db)
+	inventoryTransactionRepo := inv_repo.NewInventoryTransactionRepository(db)
+	inventoryService := inv_service.NewInventoryService(itemRepo, warehouseRepo, inventoryTransactionRepo)
+	// Correctly use inv_handlers for NewInventoryHandlers
+	inventoryAPIHandlers := inv_handlers.NewInventoryHandlers(inventoryService)
 
-	// Initialize handlers
-	accountingHandlers := handlers.NewAccountingHandlers(accountingService)
-	// Add other handlers here
-
-	// Register routes for different modules
-	// All routes can be prefixed with /api/v1 if desired, handled by subrouters or PathPrefix
-	// Example: apiV1 := r.PathPrefix("/api/v1").Subrouter()
 
 	// Apply global middleware (e.g., logging, CORS, authentication if globally applied)
-	// r.Use(middleware.LoggingMiddleware) // Example global logging middleware
-	// r.Use(middleware.CORSMiddleware)    // Example CORS middleware
+	// r.Use(middleware.LoggingMiddleware)
+	// r.Use(middleware.CORSMiddleware)
+	// apiV1Router := r.PathPrefix("/api/v1").Subrouter()
+	// apiV1Router.Use(middleware.Authenticate) // Apply auth to all /api/v1 routes
 
-	// For authenticated routes:
-	// authRouter := r.PathPrefix("/api/v1").Subrouter() // Or apply to specific subrouters
-	// authRouter.Use(middleware.Authenticate) // Apply authentication middleware
 
-	// Register Accounting Module Routes (these are already prefixed with /api/v1/accounting in the handler)
-	// If Authenticate middleware should apply to these, it needs to be on `r` or a parent subrouter.
-	// For now, let's assume accounting routes might need authentication.
-	// We can create a subrouter for authenticated API endpoints.
+	// Register routes for different modules
+	// The handlers themselves define full paths starting with /api/v1/...
+	// So, we register them directly on the main router `r`.
 
-	// Example: Group API routes that need authentication
-	// This assumes that all routes registered by accountingHandlers.RegisterAccountingRoutes
-	// are intended to be under /api/v1 and require authentication.
-	// The handler itself defines /api/v1/accounting/*, so we can attach middleware to `r` if all are auth'd
-	// or be more granular.
-	// Let's make a general API subrouter and apply auth there.
-
-	apiRouter := r.PathPrefix("/api/v1").Subrouter()
-	// To enable authentication for all /api/v1 routes:
-	// apiRouter.Use(middleware.Authenticate) // Uncomment when JWT/auth is fully set up
-
-	// Pass the main router `r` to RegisterAccountingRoutes, as it internally defines paths starting with /api/v1
-	// OR pass `apiRouter` if RegisterAccountingRoutes defines paths relative to it (e.g., "/accounting/journals")
-	// Given the current RegisterAccountingRoutes, it expects the main router `r`.
-	accountingHandlers.RegisterAccountingRoutes(r) // Registers routes like /api/v1/accounting/...
-
-	// If we wanted all routes from accountingHandlers to be under an `apiRouter` that already has `/api/v1`
-	// and potentially middleware like `Authenticate`, then RegisterAccountingRoutes would need to
-	// define its paths relative to that subrouter (e.g. `coaRouter := r.PathPrefix("/accounts").Subrouter()`).
-	// For now, the current setup is fine, assuming `middleware.Authenticate` would be added to `r` or `apiRouter` as needed.
-
-	// Example of how to use the Authenticate middleware on a specific group if not all routes need it:
-	// authenticatedAccountingRouter := r.PathPrefix("/api/v1/accounting").Subrouter()
-	// authenticatedAccountingRouter.Use(middleware.Authenticate)
-	// accountingHandlers.RegisterAccountingRoutes(authenticatedAccountingRouter) // This would require handler paths to be relative
-
-	// Add more module route registrations here:
-	// e.g., inventoryHandlers.RegisterInventoryRoutes(apiRouter) // if apiRouter is /api/v1
+	accountingAPIHandlers.RegisterAccountingRoutes(r)
+	inventoryAPIHandlers.RegisterInventoryRoutes(r)
+	// Add more module route registrations here as they are implemented
 
 	logger.InfoLogger.Println("Router initialization complete.")
 	return r
