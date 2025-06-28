@@ -1,0 +1,99 @@
+name: Frontend CI
+
+on:
+  push:
+    branches: [ main ] # Or your default branch
+    paths:
+      - 'frontend/**'
+  pull_request:
+    branches: [ main ] # Or your default branch
+    paths:
+      - 'frontend/**'
+
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./frontend
+
+    strategy:
+      matrix:
+        node-version: [18.x] # Matches React 18 typical environment
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run linters
+      run: npm run lint # Assumes you'll add a lint script to package.json
+
+    - name: Run tests
+      run: npm test -- --watchAll=false # Runs tests in non-interactive mode
+
+    - name: Build application
+      run: npm run build
+      env:
+        CI: true # CRA build script often uses this
+        # REACT_APP_SENTRY_DSN: ${{ secrets.SENTRY_DSN }} # Example for Sentry DSN
+        # Add other build-time environment variables here
+
+  # Optional: Add Cypress E2E tests here if needed as a separate job
+  # e2e-tests:
+  #   runs-on: ubuntu-latest
+  #   needs: build_and_test # Run after build and unit tests
+  #   defaults:
+  #     run:
+  #       working-directory: ./frontend
+  #   steps:
+  #   - uses: actions/checkout@v3
+  #   - name: Use Node.js
+  #     uses: actions/setup-node@v3
+  #     with:
+  #       node-version: 18.x
+  #       cache: 'npm'
+  #       cache-dependency-path: frontend/package-lock.json
+  #   - name: Install dependencies
+  #     run: npm ci
+  #   - name: Cypress run
+  #     uses: cypress-io/github-action@v5
+  #     with:
+  #       working-directory: frontend
+  #       build: npm run build # Or if you want to test against dev server: start: npm start
+  #       wait-on: 'http://localhost:3000' # If testing dev server
+  #       # browser: chrome # specify browser if needed
+  #     env:
+  #       CYPRESS_SENTRY_DSN: ${{ secrets.SENTRY_DSN }} # Example
+  #       # Add other Cypress env vars here
+  #       # Note: For testing `build` output, you'd need to serve the static files and point Cypress to that.
+  #       # The above example is more for a dev server. For build, you might use `npx http-server build`
+  #       # and then `wait-on` for that server. Or use `cypress run --config baseUrl=...`
+  #       # and skip wait-on if testing a built app served by Cypress itself (less common for CRA).
+  #       # For now, this section is commented out as it requires more setup.
+      env:
+        # Common environment variables for all steps in this job
+        # Example: NODE_ENV: 'test'
+        # REACT_APP_API_BASE_URL: ${{ vars.API_BASE_URL_STAGING }} # Using repository/org variables
+        REACT_APP_SENTRY_DSN: ${{ secrets.SENTRY_DSN }} # Using secrets
+        # Ensure these secrets/variables are configured in your GitHub repository settings.
+        # SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }} # If needed for sourcemaps etc.
+        # SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+        # SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+
+    # Optional: Deploy step (e.g., to GitHub Pages, S3, etc.)
+    # - name: Deploy to GitHub Pages
+    #   if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    #   uses: peaceiris/actions-gh-pages@v3
+    #   with:
+    #     github_token: ${{ secrets.GITHUB_TOKEN }}
+    #     publish_dir: ./frontend/build
