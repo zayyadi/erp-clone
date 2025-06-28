@@ -1,16 +1,24 @@
 import { configureStore } from '@reduxjs/toolkit';
-// We will add reducers here later
+import coaReducer from './features/accounting/coa/coaSlice';
+import itemReducer from './features/inventory/items/itemSlice';
+import notificationReducer from './features/notifications/notificationSlice'; // Import notification reducer
+// Import other reducers here as they are created
 
 export const store = configureStore({
   reducer: {
-    // Add your reducers here:
+    coa: coaReducer,
+    item: itemReducer,
+    notification: notificationReducer, // Add notification reducer
     // example: exampleReducer,
+    // Add other reducers here:
+    // journal: journalReducer,
+    // warehouse: warehouseReducer,
+    // etc.
   },
 });
 
 // Infer the `RootState` and `AppDispatch` types from the store itself
 export type RootState = ReturnType<typeof store.getState>;
-// Inferred type: {posts: PostsState, comments: CommentsState, users: UsersState}
 export type AppDispatch = typeof store.dispatch;
 
 export default store;
