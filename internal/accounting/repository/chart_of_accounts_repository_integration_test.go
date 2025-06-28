@@ -1,4 +1,4 @@
-package repository_test
+package repository_test // Changed package declaration
 
 import (
 	"context"
@@ -9,9 +9,10 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
+	// "github.com/stretchr/testify/assert" // REMOVED - suite provides assertions
 	"github.com/stretchr/testify/suite"
 	"gorm.io/gorm"
+	// app_errors "erp-system/pkg/errors" // REMOVED - Not actually used for IsType check
 )
 
 // ChartOfAccountRepositoryIntegrationTestSuite defines the suite for ChartOfAccountRepository integration tests.
@@ -25,8 +26,7 @@ type ChartOfAccountRepositoryIntegrationTestSuite struct {
 // SetupSuite runs once before all tests in the suite.
 func (s *ChartOfAccountRepositoryIntegrationTestSuite) SetupSuite() {
 	s.T().Log("Setting up suite for ChartOfAccountRepository integration tests...")
-	// dbInstance is initialized in TestMain from integration_test_setup_test.go
-	s.db = dbInstance
+	s.db = dbInstance_acc_repo // Use the DB instance from the local setup
 	s.repo = repository.NewChartOfAccountRepository(s.db)
 	s.ctx = context.Background()
 	s.T().Log("Suite setup complete.")
@@ -35,8 +35,7 @@ func (s *ChartOfAccountRepositoryIntegrationTestSuite) SetupSuite() {
 // SetupTest runs before each test in the suite.
 func (s *ChartOfAccountRepositoryIntegrationTestSuite) SetupTest() {
 	s.T().Logf("Setting up test: %s", s.T().Name())
-	// Reset tables before each test to ensure a clean state
-	resetTables(s.T(), s.db)
+	resetAccRepoTables(s.T(), s.db) // Use the reset function from the local setup
 	s.T().Logf("Test setup complete for: %s", s.T().Name())
 }
 
@@ -51,7 +50,7 @@ func (s *ChartOfAccountRepositoryIntegrationTestSuite) TearDownTest() {
 // TestChartOfAccountRepositoryIntegration runs the entire suite.
 func TestChartOfAccountRepositoryIntegration(t *testing.T) {
 	if testing.Short() {
-		t.Skip("Skipping integration tests in short mode.")
+		t.Skip("Skipping accounting repository integration tests in short mode.")
 	}
 	t.Log("Starting ChartOfAccountRepositoryIntegration Test Suite...")
 	suite.Run(t, new(ChartOfAccountRepositoryIntegrationTestSuite))
@@ -69,7 +68,7 @@ func (s *ChartOfAccountRepositoryIntegrationTestSuite) TestCreateChartOfAccount(
 	}
 
 	createdAccount, err := s.repo.Create(s.ctx, &account)
-	s.NoError(err, "Failed to create chart of account")
+	s.NoError(err, "Failed to create chart of account") // Uses suite's s.NoError
 	s.NotNil(createdAccount, "Created account should not be nil")
 	s.NotEqual(uuid.Nil, createdAccount.ID, "ID should be set")
 	s.Equal("1010", createdAccount.AccountCode)

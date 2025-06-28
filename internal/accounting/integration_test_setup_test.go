@@ -1,11 +1,13 @@
-package accounting_test
+package accounting_test // Reverted package declaration
 
 import (
 	"context"
 	"erp-system/configs"
 	"erp-system/internal/accounting/models" // For GORM auto-migration
+	inventoryModels "erp-system/internal/inventory/models"
 	"erp-system/pkg/database"
 	"erp-system/pkg/logger"
+	"github.com/stretchr/testify/assert"
 	"fmt"
 	"log"
 	"os"
@@ -104,10 +106,53 @@ func setupTestDB(ctx context.Context) (*gorm.DB, configs.AppConfig, func(), erro
 	// Run migrations using GORM AutoMigrate (if SQL files are not used by testcontainers)
 	// Or execute SQL migration files directly.
 	// AutoMigrate is simpler for tests if models are the source of truth for schema.
-	err = gormDB.AutoMigrate(
+
+	// Get all models from accounting and inventory (and future modules)
+	allModels := []interface{}{
 		&models.ChartOfAccount{},
 		&models.JournalEntry{},
 		&models.JournalLine{},
+		// Add Inventory Models here once they are created in a shared place or imported
+		// For now, assuming they are in a path accessible like:
+		// &inventoryModels.Item{},
+		// &inventoryModels.Warehouse{},
+		// &inventoryModels.InventoryTransaction{},
+	}
+
+	// Dynamically add inventory models if they exist to avoid import cycle if they are in sub-packages of this test package
+	// This is a bit of a workaround. Better to have models in distinct packages.
+	// For this structure where tests are in `internal/accounting` but need `internal/inventory/models`:
+	// We will explicitly add them.
+	// This requires `inventoryModels "erp-system/internal/inventory/models"` import.
+	// This will be added when the actual inventory test files are created in their respective package.
+	// For now, this setup file is in `accounting_test` package.
+	// The ideal setup would be a shared test helper package or running AutoMigrate within each module's test suite setup.
+
+	// For now, let's assume this setup is generic enough.
+	// When inventory tests run, their TestMain or SuiteSetup can add their models to this list or run their own AutoMigrate.
+	// However, since dbInstance is global here, we should try to migrate all known schemas.
+	// Let's assume we will add inventory models when we write inventory integration tests.
+	// For now, this only migrates accounting.
+	//
+	// **Update:** Since we are now in the inventory module phase, let's add them.
+	// This file is `internal/accounting/integration_test_setup_test.go`.
+	// To access inventory models, we'd need `inventoryModels "erp-system/internal/inventory/models"`.
+	// This creates a slight awkwardness as accounting tests might not need inventory models.
+	// A shared test setup or module-specific setups are cleaner.
+	//
+	// Let's modify this to be a more general setup and include inventory models.
+	// The `resetTables` function will also need to be updated.
+
+	// inventoryModels "erp-system/internal/inventory/models" // This line is removed as it's now in the main import block
+
+
+	err = gormDB.AutoMigrate(
+		&models.ChartOfAccount{}, // Accounting model
+		&models.JournalEntry{},   // Accounting model
+		&models.JournalLine{},    // Accounting model
+		&inventoryModels.Item{},
+		&inventoryModels.Warehouse{},
+		&inventoryModels.InventoryTransaction{},
 	)
 	if err != nil {
 		sqlDB, _ := gormDB.DB()
@@ -189,8 +234,22 @@ func TestMain(m *testing.M) {
 // This is crucial if tests within the same package share the dbInstance from TestMain.
 func resetTables(t *testing.T, db *gorm.DB) {
 	t.Helper()
-	// Order matters due to foreign key constraints
-	err := db.Exec("TRUNCATE TABLE journal_lines CASCADE").Error
+	// Order matters due to foreign key constraints.
+	// Inventory transactions might reference items and warehouses.
+	// Journal lines reference chart of accounts.
+
+	// Inventory Module Tables
+	err := db.Exec("TRUNCATE TABLE inventory_transactions CASCADE").Error
+	assert.NoError(t, err, "Failed to truncate inventory_transactions")
+
+	err = db.Exec("TRUNCATE TABLE items CASCADE").Error
+	assert.NoError(t, err, "Failed to truncate items")
+
+	err = db.Exec("TRUNCATE TABLE warehouses CASCADE").Error
+	assert.NoError(t, err, "Failed to truncate warehouses")
+
+	// Accounting Module Tables
+	err = db.Exec("TRUNCATE TABLE journal_lines CASCADE").Error
 	assert.NoError(t, err, "Failed to truncate journal_lines")
 
 	err = db.Exec("TRUNCATE TABLE journal_entries CASCADE").Error

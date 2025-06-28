@@ -1,17 +1,18 @@
-package repository_test
+package repository_test // Changed package declaration
 
 import (
 	"context"
 	"erp-system/internal/accounting/models"
 	"erp-system/internal/accounting/repository"
-	app_errors "erp-system/pkg/errors" // Alias to avoid conflict
+	// app_errors "erp-system/pkg/errors" // Alias to avoid conflict - REMOVED as unused directly by suite methods
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
+	// "github.com/stretchr/testify/assert" // REMOVED as suite.Assert() or s.Assert() is used
 	"github.com/stretchr/testify/suite"
 	"gorm.io/gorm"
+	app_errors "erp-system/pkg/errors" // Re-add if specific error type checks are needed outside suite methods
 )
 
 // JournalEntryRepositoryIntegrationTestSuite defines the suite for JournalEntryRepository integration tests.
@@ -31,7 +32,7 @@ type JournalEntryRepositoryIntegrationTestSuite struct {
 // SetupSuite runs once before all tests in the suite.
 func (s *JournalEntryRepositoryIntegrationTestSuite) SetupSuite() {
 	s.T().Log("Setting up suite for JournalEntryRepository integration tests...")
-	s.db = dbInstance // From integration_test_setup_test.go
+	s.db = dbInstance_acc_repo // Use the DB instance from the local setup
 	s.repo = repository.NewJournalEntryRepository(s.db)
 	s.coaRepo = repository.NewChartOfAccountRepository(s.db) // Initialize COA repo
 	s.ctx = context.Background()
@@ -41,7 +42,7 @@ func (s *JournalEntryRepositoryIntegrationTestSuite) SetupSuite() {
 // SetupTest runs before each test in the suite.
 func (s *JournalEntryRepositoryIntegrationTestSuite) SetupTest() {
 	s.T().Logf("Setting up test: %s", s.T().Name())
-	resetTables(s.T(), s.db) // Reset all relevant tables
+	resetAccRepoTables(s.T(), s.db) // Use the reset function from the local setup
 
 	// Create common accounts for use in tests
 	s.cashAccount = s.createTestAccount("1010", "Cash Test", models.Asset)
@@ -62,7 +63,7 @@ func (s *JournalEntryRepositoryIntegrationTestSuite) createTestAccount(code, nam
 // TestJournalEntryRepositoryIntegration runs the entire suite.
 func TestJournalEntryRepositoryIntegration(t *testing.T) {
 	if testing.Short() {
-		t.Skip("Skipping integration tests in short mode.")
+		t.Skip("Skipping accounting repository integration tests in short mode.")
 	}
 	t.Log("Starting JournalEntryRepositoryIntegration Test Suite...")
 	suite.Run(t, new(JournalEntryRepositoryIntegrationTestSuite))
@@ -83,7 +84,7 @@ func (s *JournalEntryRepositoryIntegrationTestSuite) TestCreateJournalEntry_With
 	}
 
 	createdEntry, err := s.repo.Create(s.ctx, &entry)
-	s.NoError(err, "Failed to create journal entry")
+	s.NoError(err, "Failed to create journal entry") // Uses suite's s.NoError
 	s.NotNil(createdEntry)
 	s.NotEqual(uuid.Nil, createdEntry.ID)
 	s.Len(createdEntry.JournalLines, 2, "Should have 2 journal lines")
@@ -122,7 +123,8 @@ func (s *JournalEntryRepositoryIntegrationTestSuite) TestGetJournalEntryByID_Wit
 	nonExistentID := uuid.New()
 	_, err = s.repo.GetByID(s.ctx, nonExistentID)
 	s.Error(err, "Expected error for non-existent ID")
-	_, ok := err.(*app_errors.NotFoundError) // Check for custom error type
+	// Re-added app_errors for this specific type check
+	_, ok := err.(*app_errors.NotFoundError)
     s.True(ok, "Expected NotFoundError type")
 }
 

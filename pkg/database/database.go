@@ -1,13 +1,16 @@
 package database
 
 import (
+	"erp-system/configs"
 	"fmt"
 	"log"
+	"os" // <-- ADDED
 	"sync"
+	"time" // <-- ADDED
 
 	"gorm.io/driver/postgres" // Or any other driver you plan to use
 	"gorm.io/gorm"
-	"erp-system/configs"
+	gorm_logger "gorm.io/gorm/logger" // <-- ADDED (aliased or direct)
 )
 
 var (

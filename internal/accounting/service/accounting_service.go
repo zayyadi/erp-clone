@@ -225,7 +225,9 @@ func (s *accountingService) UpdateChartOfAccount(ctx context.Context, id uuid.UU
 func (s *accountingService) DeleteChartOfAccount(ctx context.Context, id uuid.UUID) error {
 	logger.InfoLogger.Printf("Service: Attempting to delete chart of account with ID: %s", id)
 
-	account, err := s.coaRepo.GetByID(ctx, id)
+	// Fetch account to ensure it exists before attempting deletion.
+	// The 'account' variable itself is not used further if the detailed checks are commented out.
+	_, err := s.coaRepo.GetByID(ctx, id)
 	if err != nil {
 		logger.ErrorLogger.Printf("Service: Error finding chart of account %s for deletion: %v", id, err)
 		return err // Propagate (could be NotFoundError)

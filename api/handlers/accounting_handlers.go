@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"erp-system/internal/accounting/models"
 	"erp-system/internal/accounting/service"
-	dto "erp-system/internal/accounting/service/dto"
-	"erp-system/pkg/errors"
-	"erp-system/pkg/logger"
+	acc_dto "erp-system/internal/accounting/service/dto" // Alias for accounting specific DTOs
+	"erp-system/pkg/errors" // Keep this for type assertion in respondWithError if it's still specific
+	// "erp-system/pkg/logger" // REMOVED - No longer directly used here
 	"net/http"
 	"strconv" // For parsing limit/page from query
+	"time"    // Was missing, needed for date parsing in GetTrialBalance
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
@@ -50,60 +51,12 @@ func (h *AccountingHandlers) RegisterAccountingRoutes(r *mux.Router) {
 	// Add other report routes here, e.g., Balance Sheet, P&L
 }
 
-// --- Utility Functions for Handlers ---
-
-func respondWithError(w http.ResponseWriter, err error) {
-	logger.ErrorLogger.Printf("API Error: %v", err)
-	var statusCode int
-	var apiError dto.ErrorResponse
-
-	switch e := err.(type) {
-	case *errors.NotFoundError:
-		statusCode = http.StatusNotFound
-		apiError = dto.ErrorResponse{Status: "error", Message: e.Error()}
-	case *errors.ValidationError:
-		statusCode = http.StatusBadRequest
-		apiError = dto.ErrorResponse{Status: "error", Message: e.Error(), Details: e.Field} // Or a map of field errors
-	case *errors.ConflictError:
-		statusCode = http.StatusConflict
-		apiError = dto.ErrorResponse{Status: "error", Message: e.Error()}
-	case *errors.UnauthorizedError:
-		statusCode = http.StatusUnauthorized
-		apiError = dto.ErrorResponse{Status: "error", Message: e.Error()}
-	case *errors.ForbiddenError:
-		statusCode = http.StatusForbidden
-		apiError = dto.ErrorResponse{Status: "error", Message: e.Error()}
-	default:
-		statusCode = http.StatusInternalServerError
-		apiError = dto.ErrorResponse{Status: "error", Message: "An unexpected internal server error occurred."}
-		// For production, you might not want to expose internal error details like e.Error()
-		// For debugging: apiError.Details = e.Error()
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(apiError)
-}
-
-func respondWithJSON(w http.ResponseWriter, statusCode int, payload interface{}) {
-	response := dto.SuccessResponse{
-		Status: "success",
-		Data:   payload,
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		logger.ErrorLogger.Printf("Failed to encode JSON response: %v", err)
-		// Fallback error response if JSON encoding fails for the success response
-		http.Error(w, `{"status":"error","message":"Failed to encode response"}`, http.StatusInternalServerError)
-	}
-}
-
+// respondWithError and respondWithJSON are now in response_utils.go (same package)
 
 // --- Chart of Accounts Handlers ---
 
 func (h *AccountingHandlers) CreateChartOfAccount(w http.ResponseWriter, r *http.Request) {
-	var req dto.CreateChartOfAccountRequest
+	var req acc_dto.CreateChartOfAccountRequest // Changed to acc_dto
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondWithError(w, errors.NewValidationError("Invalid request payload", err.Error()))
 		return
@@ -182,7 +135,7 @@ func (h *AccountingHandlers) UpdateChartOfAccount(w http.ResponseWriter, r *http
 		return
 	}
 
-	var req dto.UpdateChartOfAccountRequest
+	var req acc_dto.UpdateChartOfAccountRequest // Changed to acc_dto
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondWithError(w, errors.NewValidationError("Invalid request payload", err.Error()))
 		return
@@ -219,7 +172,7 @@ func (h *AccountingHandlers) DeleteChartOfAccount(w http.ResponseWriter, r *http
 
 func (h *AccountingHandlers) ListChartOfAccounts(w http.ResponseWriter, r *http.Request) {
 	queryParams := r.URL.Query()
-	listReq := dto.ListChartOfAccountsRequest{
+	listReq := acc_dto.ListChartOfAccountsRequest{ // Changed to acc_dto
 		Page:        1,  // Default
 		Limit:       20, // Default
 		AccountName: queryParams.Get("account_name"),
@@ -253,12 +206,8 @@ func (h *AccountingHandlers) ListChartOfAccounts(w http.ResponseWriter, r *http.
 		return
 	}
 
-	paginatedResponse := struct {
-		Data  []*models.ChartOfAccount `json:"data"`
-		Page  int                      `json:"page"`
-		Limit int                      `json:"limit"`
-		Total int64                    `json:"total"`
-	}{
+	// Use shared PaginatedResponse type from handlers package
+	paginatedResponse := PaginatedResponse{
 		Data:  accounts,
 		Page:  listReq.Page,
 		Limit: listReq.Limit,
@@ -271,7 +220,7 @@ func (h *AccountingHandlers) ListChartOfAccounts(w http.ResponseWriter, r *http.
 // --- Journal Entries Handlers ---
 
 func (h *AccountingHandlers) CreateJournalEntry(w http.ResponseWriter, r *http.Request) {
-	var req dto.CreateJournalEntryRequest
+	var req acc_dto.CreateJournalEntryRequest // Changed to acc_dto
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondWithError(w, errors.NewValidationError("Invalid request payload", err.Error()))
 		return
@@ -320,7 +269,7 @@ func (h *AccountingHandlers) UpdateJournalEntry(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	var req dto.UpdateJournalEntryRequest
+	var req acc_dto.UpdateJournalEntryRequest // Changed to acc_dto
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondWithError(w, errors.NewValidationError("Invalid request payload", err.Error()))
 		return
@@ -357,9 +306,9 @@ func (h *AccountingHandlers) DeleteJournalEntry(w http.ResponseWriter, r *http.R
 
 func (h *AccountingHandlers) ListJournalEntries(w http.ResponseWriter, r *http.Request) {
 	queryParams := r.URL.Query()
-	listReq := dto.ListJournalEntriesRequest{
-		Page:        1, // Default
-		Limit:       20, // Default
+	listReq := acc_dto.ListJournalEntriesRequest{ // Changed to acc_dto
+		Page:        1,
+		Limit:       20,
 		Description: queryParams.Get("description"),
 		Reference:   queryParams.Get("reference"),
 		Status:      models.JournalStatus(queryParams.Get("status")),
@@ -407,12 +356,8 @@ func (h *AccountingHandlers) ListJournalEntries(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	paginatedResponse := struct {
-		Data  []*models.JournalEntry `json:"data"`
-		Page  int                    `json:"page"`
-		Limit int                    `json:"limit"`
-		Total int64                  `json:"total"`
-	}{
+	// Use shared PaginatedResponse type from handlers package
+	paginatedResponse := PaginatedResponse{
 		Data:  entries,
 		Page:  listReq.Page,
 		Limit: listReq.Limit,
@@ -457,11 +402,11 @@ func (h *AccountingHandlers) GetTrialBalance(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	req := dto.TrialBalanceRequest{
+	req := acc_dto.TrialBalanceRequest{ // Changed to acc_dto
 		EndDate: endDate,
 	}
     if startDateStr := queryParams.Get("start_date"); startDateStr != "" {
-        if t, err := time.Parse("2006-01-02", startDateStr); err == nil {
+        if t, err := time.Parse("2006-01-02", startDateStr); err == nil { // time.Parse needs "time" import
             req.StartDate = t
         } else {
             respondWithError(w, errors.NewValidationError("Invalid start_date format, use YYYY-MM-DD", "start_date"))
@@ -477,7 +422,6 @@ func (h *AccountingHandlers) GetTrialBalance(w http.ResponseWriter, r *http.Requ
             return
         }
 	}
-
 
 	report, err := h.service.GetTrialBalance(r.Context(), req)
 	if err != nil {
