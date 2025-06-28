@@ -24,20 +24,20 @@ var GlobalConfig AppConfig
 
 // LoadConfig loads configuration from file and environment variables.
 func LoadConfig(path string) (AppConfig, error) {
-	viper.AddConfigPath(path) // Path to look for the config file in
+	viper.AddConfigPath(path)  // Path to look for the config file in
 	viper.SetConfigName("app") // Name of config file (without extension)
 	viper.SetConfigType("env") // Config file type (e.g., .env, .yaml, .json)
 
 	viper.AutomaticEnv() // Read in environment variables that match
 
-	// Set default values
-	viper.SetDefault("SERVER_PORT", "8080")
-	viper.SetDefault("DB_HOST", "localhost")
-	viper.SetDefault("DB_PORT", "5432")
-	viper.SetDefault("DB_USER", "postgres")
-	viper.SetDefault("DB_PASSWORD", "password")
-	viper.SetDefault("DB_NAME", "erp_dev")
-	viper.SetDefault("DB_SSLMODE", "disable")
+	// // Set default values
+	// viper.SetDefault("SERVER_PORT", "8080")
+	// viper.SetDefault("DB_HOST", "localhost")
+	// viper.SetDefault("DB_PORT", "5432")
+	// viper.SetDefault("DB_USER", "postgres")
+	// viper.SetDefault("DB_PASSWORD", "password")
+	// viper.SetDefault("DB_NAME", "erp_dev")
+	// viper.SetDefault("DB_SSLMODE", "disable")
 
 	err := viper.ReadInConfig() // Find and read the config file
 	if err != nil {

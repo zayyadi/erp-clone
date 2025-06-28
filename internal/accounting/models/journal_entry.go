@@ -11,9 +11,9 @@ import (
 type JournalStatus string
 
 const (
-	StatusDraft   JournalStatus = "DRAFT"
-	StatusPosted  JournalStatus = "POSTED"
-	StatusVoided  JournalStatus = "VOIDED" // Example of an additional status
+	StatusDraft  JournalStatus = "DRAFT"
+	StatusPosted JournalStatus = "POSTED"
+	StatusVoided JournalStatus = "VOIDED" // Example of an additional status
 )
 
 // JournalEntry represents a financial transaction header.
@@ -21,7 +21,7 @@ type JournalEntry struct {
 	ID          uuid.UUID      `gorm:"type:uuid;primary_key;" json:"id"`
 	EntryDate   time.Time      `gorm:"not null" json:"entry_date"`
 	Description string         `gorm:"type:varchar(255)" json:"description"`
-	Reference   string         `gorm:"type:varchar(100)" json:"reference"` // E.g., Invoice number, PO number
+	Reference   string         `gorm:"type:varchar(100)" json:"reference"`                       // E.g., Invoice number, PO number
 	Status      JournalStatus  `gorm:"type:varchar(20);default:'POSTED';not null" json:"status"` // Default to DRAFT might be safer in some flows
 	CreatedAt   time.Time      `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt   time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
@@ -30,6 +30,23 @@ type JournalEntry struct {
 	// Associations
 	JournalLines []JournalLine `gorm:"foreignKey:JournalID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"journal_lines"` // Lines associated with this entry
 }
+
+// JournalLine represents a single debit or credit in a journal entry.
+// type JournalLine struct {
+// 	ID          uuid.UUID      `gorm:"type:uuid;primary_key;" json:"id"`
+// 	JournalID   uuid.UUID      `gorm:"type:uuid;not null;index" json:"journal_id"`
+// 	AccountID   uuid.UUID      `gorm:"type:uuid;not null;index" json:"account_id"`
+// 	Amount      float64        `gorm:"type:decimal(18,4);not null" json:"amount"` // Use decimal in DB for precision
+// 	Currency    string         `gorm:"type:varchar(3);not null;default:'USD'" json:"currency"`
+// 	IsDebit     bool           `gorm:"not null" json:"is_debit"`
+// 	Description string         `gorm:"type:varchar(255)" json:"description"`
+// 	CreatedAt   time.Time      `gorm:"autoCreateTime" json:"created_at"`
+// 	UpdatedAt   time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
+// 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+
+// 	// Associations
+// 	ChartOfAccount *ChartOfAccount `gorm:"foreignKey:AccountID" json:"chart_of_account,omitempty"`
+// }
 
 // TableName specifies the table name for JournalEntry model.
 func (JournalEntry) TableName() string {
@@ -56,6 +73,19 @@ func (je *JournalEntry) BeforeCreate(tx *gorm.DB) (err error) {
 	}
 	if je.EntryDate.IsZero() {
 		je.EntryDate = time.Now()
+	}
+	return
+}
+
+// TableName specifies the table name for JournalLine model.
+func (JournalLine) TableName() string {
+	return "journal_lines"
+}
+
+// BeforeCreate will set a UUID for the new journal line.
+func (jl *JournalLine) BeforeCreate(tx *gorm.DB) (err error) {
+	if jl.ID == uuid.Nil {
+		jl.ID = uuid.New()
 	}
 	return
 }
